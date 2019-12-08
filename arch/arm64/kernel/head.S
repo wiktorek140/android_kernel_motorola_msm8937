@@ -428,6 +428,11 @@ __create_page_tables:
 	sub	x6, x6, #1			// inclusive range
 	create_block_map x0, x7, x3, x5, x6
 1:
+
+	ldr	x5, =FIXADDR_TOP		// fix top address
+	add	x0, x26, #2 * PAGE_SIZE		// section table address
+	create_pgd_entry x0, x5, x6, x7
+
 	/*
 	 * Since the page tables have been populated with non-cacheable
 	 * accesses (MMU disabled), invalidate the idmap and swapper page
@@ -456,18 +461,15 @@ __mmap_switched:
 	bl	__pi_memset
 	dsb	ishst				// Make zero page visible to PTW
 
-#ifdef CONFIG_THREAD_INFO_IN_TASK
-        adrp    x4, init_thread_union
-        add     sp, x4, #THREAD_SIZE
-        adr_l   x5, init_task
-        msr     sp_el0, x5                      // Save thread_info
-#else
 	adr_l	sp, initial_sp, x4
 	mov	x4, sp
 	and	x4, x4, #~(THREAD_SIZE - 1)
+#ifdef CONFIG_THREAD_INFO_IN_TASK
+	adr_l	x5, init_task
+	msr	sp_el0, x5                      // Save thread_info
+#else
 	msr	sp_el0, x4			// Save thread_info
 #endif
-
 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
 	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
 	mov	x29, #0

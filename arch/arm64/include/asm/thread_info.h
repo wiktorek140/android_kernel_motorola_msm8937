@@ -35,13 +35,13 @@
 struct task_struct;
 struct exec_domain;
 
+#include <asm/stack_pointer.h>
 #include <asm/types.h>
 
 typedef unsigned long mm_segment_t;
 
 /*
  * low level task data that entry.S needs immediate access to.
- * __switch_to() assumes cpu_context follows immediately after cpu_domain.
  */
 struct thread_info {
 	unsigned long		flags;		/* low level flags */
@@ -57,15 +57,20 @@ struct thread_info {
 #ifndef CONFIG_THREAD_INFO_IN_TASK
 	int			cpu;		/* cpu */
 #endif
+#ifdef CONFIG_ARCH_THREAD_INFO_ALLOCATOR
+	phys_addr_t		phys_addr;	/* set if vmalloc */
+#endif
 };
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 #define INIT_THREAD_INFO(tsk)						\
 {									\
+	.exec_domain	= &default_exec_domain,				\
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	.addr_limit	= KERNEL_DS,					\
 }
 #else
+
 #define INIT_THREAD_INFO(tsk)						\
 {									\
 	.task		= &tsk,						\
@@ -74,13 +79,7 @@ struct thread_info {
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	.addr_limit	= KERNEL_DS,					\
 }
-
 #define init_thread_info	(init_thread_union.thread_info)
-
-/*
- * how to get the current stack pointer from C
- */
-register unsigned long current_stack_pointer asm ("sp");
 
 /*
  * how to get the thread information struct from C
@@ -108,6 +107,12 @@ static inline struct thread_info *current_thread_info(void)
 	((unsigned long)(tsk->thread.cpu_context.sp))
 #define thread_saved_fp(tsk)	\
 	((unsigned long)(tsk->thread.cpu_context.fp))
+
+#ifdef CONFIG_ARCH_THREAD_INFO_ALLOCATOR
+struct thread_info *alloc_thread_info_node(struct task_struct *tsk,
+						  int node);
+void free_thread_info(struct thread_info *ti);
+#endif
 
 #endif
 
